@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Expense Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .button {
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .back-btn {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Home Page -->
+<div id="homePage">
+    <h1>Business Expense Tracker - Home</h1>
+    <input type="text" id="employeeName" placeholder="Enter Employee Name">
+    <button class="button" onclick="addEmployee()">Add Employee</button>
+
+    <h2>Employee List</h2>
+    <div id="employeeButtons"></div>
+</div>
+
+<!-- Employee Expense Page (Dynamic) -->
+<div id="expensePage" style="display:none;">
+    <h1 id="employeeTitle"></h1>
+    <button class="button back-btn" onclick="goBackToHome()">Back to Home</button>
+    <button class="button back-btn" onclick="editEmployee()">Edit Employee</button>
+    <button class="button back-btn" onclick="deleteEmployee()">Delete Employee</button>
+
+    <h2>Expenses</h2>
+    <input type="date" id="expenseDate">
+    <input type="number" id="expenseAmount" placeholder="Amount in INR">
+    <button class="button" onclick="addExpense()">Add Expense</button>
+    
+    <table id="expenseTable">
+        <thead>
+            <tr>
+                <th>Sr No.</th>
+                <th>Date</th>
+                <th>Amount (INR)</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Expense data will go here -->
+        </tbody>
+    </table>
+
+    <button class="button" onclick="downloadPDF()">Download Payslip (PDF)</button>
+</div>
+
+<script>
+// Get data from local storage or initialize if empty
+function loadData() {
+    return JSON.parse(localStorage.getItem('employeeData')) || [];
+}
+
+// Save data to local storage
+function saveData(data) {
+    localStorage.setItem('employeeData', JSON.stringify(data));
+}
+
+// Display employee buttons on the home page
+function renderHomePage() {
+    const employees = loadData();
+    const employeeButtonsDiv = document.getElementById('employeeButtons');
+    employeeButtonsDiv.innerHTML = ''; // Clear existing buttons
+
+    employees.forEach((employee, index) => {
+        const button = document.createElement('button');
+        button.classList.add('button');
+        button.textContent = employee.name;
+        button.onclick = () => openExpensePage(index);
+        employeeButtonsDiv.appendChild(button);
+        employeeButtonsDiv.appendChild(document.createElement('br'));
+    });
+}
+
+// Add new employee
+function addEmployee() {
+    const name = document.getElementById('employeeName').value.trim();
+    if (name) {
+        const employees = loadData();
+        employees.push({ name, expenses: [] });
+        saveData(employees);
+        document.getElementById('employeeName').value = ''; // Clear input field
+        renderHomePage();
+    } else {
+        alert('Please enter a valid name.');
+    }
+}
+
+// Open expense page for selected employee
+function openExpensePage(employeeIndex) {
+    const employees = loadData();
+    const employee = employees[employeeIndex];
+
+    document.getElementById('homePage').style.display = 'none';
+    document.getElementById('expensePage').style.display = 'block';
+    document.getElementById('employeeTitle').textContent = `Expense Tracker - ${employee.name}`;
+
+    renderExpenseTable(employeeIndex);
+}
+
+// Go back to home page
+function goBackToHome() {
+    document.getElementById('expensePage').style.display = 'none';
+    document.getElementById('homePage').style.display = 'block';
+}
+
+// Edit employee name
+function editEmployee() {
+    const newName = prompt("Enter new name:");
+    if (newName) {
+        const employees = loadData();
+        const employeeIndex = employees.findIndex(employee => employee.name === document.getElementById('employeeTitle').textContent.split(' - ')[1]);
+        employees[employeeIndex].name = newName;
+        saveData(employees);
+        renderHomePage();
+        goBackToHome();
+    }
+}
+
+// Delete employee
+function deleteEmployee() {
+    const employees = loadData();
+    const employeeIndex = employees.findIndex(employee => employee.name === document.getElementById('employeeTitle').textContent.split(' - ')[1]);
+    employees.splice(employeeIndex, 1);
+    saveData(employees);
+    goBackToHome();
+}
+
+// Add expense for employee
+function addExpense() {
+    const employeeIndex = loadData().findIndex(employee => employee.name === document.getElementById('employeeTitle').textContent.split(' - ')[1]);
+    const date = document.getElementById('expenseDate').value;
+    const amount = parseFloat(document.getElementById('expenseAmount').value);
+
+    if (!date || isNaN(amount)) {
+        alert('Please fill in both the date and amount correctly.');
+        return;
+    }
+
+    const employees = loadData();
+    const employee = employees[employeeIndex];
+    employee.expenses.push({ date, amount });
+    saveData(employees);
+
+    renderExpenseTable(employeeIndex);
+}
+
+// Render the expense table for a specific employee
+function renderExpenseTable(employeeIndex) {
+    const employees = loadData();
+    const employee = employees[employeeIndex];
+    const tableBody = document.querySelector('#expenseTable tbody');
+    tableBody.innerHTML = '';
+
+    employee.expenses.forEach((expense, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${expense.date}</td>
+            <td>₹ ${expense.amount.toFixed(2)}</td>
+            <td>
+                <button class="button" onclick="editExpense(${employeeIndex}, ${index})">Edit</button>
+                <button class="button" onclick="deleteExpense(${employeeIndex}, ${index})">Delete</button>
+            </td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+// Edit expense
+function editExpense(employeeIndex, expenseIndex) {
+    const employees = loadData();
+    const expense = employees[employeeIndex].expenses[expenseIndex];
+
+    const newAmount = prompt('Enter new amount', expense.amount);
+    if (newAmount && !isNaN(newAmount)) {
+        employees[employeeIndex].expenses[expenseIndex].amount = parseFloat(newAmount);
+        saveData(employees);
+        renderExpenseTable(employeeIndex);
+    }
+}
+
+// Delete expense
+function deleteExpense(employeeIndex, expenseIndex) {
+    const employees = loadData();
+    employees[employeeIndex].expenses.splice(expenseIndex, 1);
+    saveData(employees);
+    renderExpenseTable(employeeIndex);
+}
+
+// Download the payslip as a PDF
+function downloadPDF() {
+    const employeeName = document.getElementById('employeeTitle').textContent.split(' - ')[1];
+    const employees = loadData();
+    const employeeIndex = employees.findIndex(employee => employee.name === employeeName);
+    const employee = employees[employeeIndex];
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.text(`Payslip of ${employee.name}`, 10, 10);
+    employee.expenses.forEach((expense, index) => {
+        doc.text(`Date: ${expense.date}`, 10, 20 + (index * 10));
+        doc.text(`Amount: ₹${expense.amount.toFixed(2)}`, 10, 30 + (index * 10));
+    });
+
+    doc.save(`${employee.name}_Payslip.pdf`);
+}
+
+// Initialize home page
+renderHomePage();
+</script>
+</body>
+</html>
