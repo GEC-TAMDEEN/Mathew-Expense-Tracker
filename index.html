@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Expense Tracker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <style>
         table {
             width: 100%;
@@ -217,7 +218,7 @@ function deleteExpense(employeeIndex, expenseIndex) {
     renderExpenseTable(employeeIndex);
 }
 
-// Download the payslip as a PDF
+// Download the payslip as a PDF with table format and auto total calculation
 function downloadPDF() {
     const employeeName = document.getElementById('employeeTitle').textContent.split(' - ')[1];
     const employees = loadData();
@@ -227,12 +228,58 @@ function downloadPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
+    // Set title for the payslip
+    doc.setFontSize(18);
     doc.text(`Payslip of ${employee.name}`, 10, 10);
-    employee.expenses.forEach((expense, index) => {
-        doc.text(`Date: ${expense.date}`, 10, 20 + (index * 10));
-        doc.text(`Amount: ₹${expense.amount.toFixed(2)}`, 10, 30 + (index * 10));
+
+    // Prepare table headers and data
+    const headers = ['Sr No.', 'Date', 'Amount (INR)'];
+    const data = employee.expenses.map((expense, index) => [
+        index + 1, 
+        expense.date, 
+        `₹ ${expense.amount.toFixed(2)}`
+    ]);
+
+    // Set up table style
+    const columnWidths = [20, 80, 50]; // Define column widths for better formatting
+
+    // Add table header
+    doc.setFontSize(12);
+    doc.setTextColor(0); // Black text color
+    doc.autoTable({
+        head: [headers],
+        body: data,
+        startY: 20,
+        margin: { top: 20, left: 10 },
+        styles: {
+            overflow: 'linebreak',
+            halign: 'center',
+            fillColor: [255, 255, 255],
+            textColor: 0,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+        },
+        columnStyles: {
+            0: { cellWidth: columnWidths[0] }, // Sr No.
+            1: { cellWidth: columnWidths[1] }, // Date
+            2: { cellWidth: columnWidths[2] }, // Amount
+        },
+        headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: 0,
+            lineWidth: 1,
+            lineColor: [0, 0, 0],
+        }
     });
 
+    // Calculate the total amount
+    const totalAmount = employee.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+    // Add total amount at the bottom of the table
+    const totalText = `Total Amount: ₹ ${totalAmount.toFixed(2)}`;
+    doc.text(totalText, 10, doc.lastAutoTable.finalY + 10);
+
+    // Save PDF
     doc.save(`${employee.name}_Payslip.pdf`);
 }
 
